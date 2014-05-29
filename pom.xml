@@ -50,10 +50,16 @@ minitest
 	</properties>
 
 	<dependencies>
+        	<dependency>
+          		<groupId>net.java.dev.jna</groupId>
+          		<artifactId>jna</artifactId>
+          		<scope>provided</scope>
+          		<version>[3.4.1,4.0.0]</version>
+        	</dependency>
 		<dependency>
-			<groupId>jna</groupId>
-			<artifactId>jna</artifactId>
-			<version>4.1.0</version>
+			<groupId>org.libvirt</groupId>
+			<artifactId>libvirt</artifactId>
+			<version>1.0</version>
 		</dependency>
 		<dependency>
 			<groupId>junit</groupId>

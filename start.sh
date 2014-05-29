@@ -2,7 +2,7 @@
 
 export JAVA_HOME=/usr
 
-git clone libvirt.org/libvirt-python.git
+git clone git://libvirt.org/libvirt-python.git
 git clone git://libvirt.org/libvirt-java.git
 
 cp pom.xml.libvirt-java libvirt-java/pom.xml
