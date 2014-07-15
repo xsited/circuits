@@ -3,7 +3,7 @@
 '''
 
 
-
+pip install flask Flask-HTTPAuth
 
 '''
 
@@ -132,6 +132,14 @@ def delete_circuits(circuit_id):
         abort(404)
     circuits.remove(circuit[0])
     return jsonify( { 'result': True } )
+    
+@app.route('/orchestrator/api/v1.0/performancemetrics/<int:circuit_id>', methods = ['GET'])
+# @auth.login_required
+def performance_metrics_get(circuit_id):
+    circuit = filter(lambda t: t['id'] == circuit_id, circuits)
+    if len(circuit) == 0:
+        abort(404)
+    return jsonify( { 'circuit': make_circuit_metrics(circuit_id, latency, throughput) } ), 201
 
 @app.route('/compute/api/v1.0/faultmonitor/<int:circuit_id>', methods = ['POST'])
 # @auth.login_required
@@ -170,5 +178,5 @@ def compute_circuit_create():
 
     
 if __name__ == '__main__':
-    app.run(debug = True)
+    app.run('0.0.0.0', 5555, debug=True)
 
