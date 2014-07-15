@@ -67,6 +67,11 @@ def make_circuit(circuit):
 def get_circuits():
     return jsonify( { 'circuits': map(make_circuit, circuits) } )
  
+@app.route('/orchestrator/api/v1.0/hello', methods = ['GET'])
+# @auth.login_required
+def get_hello():
+    return jsonify( { 'hello': 'world' } )
+ 
 @app.route('/orchestrator/api/v1.0/circuit/<int:circuit_id>', methods = ['GET'])
 # @auth.login_required
 def get_circuit(circuit_id):
