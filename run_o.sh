@@ -11,7 +11,7 @@
     ### END INIT INFO
 
     # Change the next 3 lines to suit where you install your script and what you want to call it
-    DIR=/home/selabs/git/nfv
+    DIR=/home/selabs/nfv
     DAEMON=$DIR/o.py
     DAEMON_NAME=o
 
