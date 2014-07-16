@@ -207,9 +207,9 @@ Request methods using CURL:
  
 2. curl -i -u user:password http://localhost:5555/orchestrator/api/v1.0/circuits/2
  
-3. curl -i -u user:password -H "Content-Type: application/json" -X POST -d '{ "service_type": "epl", "start_ip_ address": "192.168.1.3", "end_ip_address": "192.168.1.4", "classifier": "red" }' http://localhost:5555/orchestrator/api/v1.0/circuits
+3. curl -i -u user:password -H "Content-Type: application/json" -X POST -d '{ "service_type": "epl", "start_ip_ address": "192.168.1.3", "end_ip_address": "192.168.1.4", "classifier": "red", "self": "http://localhost:8888/service_id/1" }' http://localhost:5555/orchestrator/api/v1.0/circuits
  
-4. curl -i -u user:password -H "Content-Type: application/json" -X POST -d '{ "service_type": "epl", "start_ip_ address": "192.168.1.3", "end_ip_address": "192.168.1.4", "classifier": "red", "active": True }' http://localhost:5555/orchestrator/api/v1.0/circuits
+4. curl -i -u user:password -H "Content-Type: application/json" -X PUT -d '{ "id": 1, "service_type": "epl", "start_ip_ address": "192.168.1.3", "end_ip_address": "192.168.1.4", "classifier": "red", self": "http://localhost:8888/service_id/1", "active": True }' http://localhost:5555/orchestrator/api/v1.0/circuits/1
  
 '''
 
