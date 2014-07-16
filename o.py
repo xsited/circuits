@@ -16,7 +16,7 @@ auth = HTTPBasicAuth()
 @auth.get_password
 def get_password(username):
     if username == 'user':
-        return 'python'
+        return 'password'
     return None
  
 @auth.error_handler
@@ -85,6 +85,7 @@ def create_circuit():
         'service_type': request.json['service_type'],
         'start_ip_address': request.json.get('start_ip_address', ""),
         'end_ip_address': request.json.get('end_ip_address', ""),
+        'classifier': request.json.get('classifier', ""),
         'active': False
     }
     circuits.append(circuit)
@@ -113,7 +114,7 @@ def update_circuits(circuit_id):
         abort(400)
     if 'service_type' in request.json and type(request.json['service_type']) != unicode:
         abort(400)
-    if 'start_ip_address' in request.json and type(request.json['description']) is not unicode:
+    if 'start_ip_address' in request.json and type(request.json['start_ip_address']) is not unicode:
         abort(400)
     if 'active' in request.json and type(request.json['active']) is not bool:
         abort(400)
@@ -179,4 +180,18 @@ def compute_circuit_create():
     
 if __name__ == '__main__':
     app.run('0.0.0.0', 5555, debug=True)
+
+
+'''
+Request methods using CURL:
+ 
+1. curl -i -u user:password http://localhost:5555/orchestration/api/v1.0/circuits
+ 
+2. curl -i -u user:password http://localhost:5555/orchestration/api/v1.0/circuits/2
+ 
+3. curl -i -u user:password -H "Content-Type: application/json" -X POST -d '{ "service_type": "epl", "start_ip_ address": "192.168.1.3", "end_ip_address": "192.168.1.4", "classifier": "red" }' http://localhost:5555/orchestration/api/v1.0/circuits
+ 
+4. curl -i -u user:password -H "Content-Type: application/json" -X PUT -d '{"active":true}' http://localhost:5555/orchestration/api/v1.0/circuits/2
+ 
+'''
 
