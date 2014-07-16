@@ -39,7 +39,8 @@ circuits = [
    'start_ip_ address': u'192.168.1.1', 
    'end_ip_address': u'192.168.1.2',
    'classifier': u'12',
-   'active': False
+   'active': False,
+   'self': 'uri'
 },
 {  
    'id': 2,
@@ -47,7 +48,8 @@ circuits = [
    'start_ip_ address': u'192.168.1.3', 
    'end_ip_address': u'192.168.1.4',
    'classifier': u'red',
-   'active': False
+   'active': False,
+   'self': 'uri'
 },
 
 ]
@@ -62,7 +64,7 @@ def make_circuit(circuit):
             new_circuit[field] = circuit[field]
     return new_circuit
     
-@app.route('/orchestrator/api/v1.0/circuit', methods = ['GET'])
+@app.route('/orchestrator/api/v1.0/circuits', methods = ['GET'])
 # @auth.login_required
 def get_circuits():
     return jsonify( { 'circuits': map(make_circuit, circuits) } )
@@ -72,7 +74,7 @@ def get_circuits():
 def get_hello():
     return jsonify( { 'hello': 'world' } )
  
-@app.route('/orchestrator/api/v1.0/circuit/<int:circuit_id>', methods = ['GET'])
+@app.route('/orchestrator/api/v1.0/circuits/<int:circuit_id>', methods = ['GET'])
 # @auth.login_required
 def get_circuit(circuit_id):
     circuit = filter(lambda t: t['id'] == circuit_id, circuits)
@@ -83,16 +85,21 @@ def get_circuit(circuit_id):
 @app.route('/orchestrator/api/v1.0/circuits', methods = ['POST'])
 # @auth.login_required
 def create_circuit():
-    if not request.json or not 'service_type' in request.json:
-        abort(400)
+    print "Create circuit"
+    print request.json
+#    if not request.json : #or not 'service_type' in request.json:
+#        abort(400)
+    print "Build circuit"
     circuit = {
         'id': circuits[-1]['id'] + 1,
         'service_type': request.json['service_type'],
         'start_ip_address': request.json.get('start_ip_address', ""),
         'end_ip_address': request.json.get('end_ip_address', ""),
         'classifier': request.json.get('classifier', ""),
+        'self': request.json.get('self', ""),
         'active': False
     }
+    print "Append circuit"
     circuits.append(circuit)
     '''
     # Call OVSDB json-rpc  to configure TEP
@@ -107,7 +114,9 @@ def create_circuit():
     rpc_faultmonitor_start(id, start_ip_address, end_ip_address);
 
     '''
-    return jsonify( { 'circuit': make_circuits(circuits) } ), 201
+    print "Return circuit"
+    return jsonify( { 'result': circuits[-1]['id'] + 1 } )
+    #return jsonify( { 'circuit': make_circuit(circuits) } ), 201
  
 @app.route('/orchestrator/api/v1.0/circuits/<int:circuit_id>', methods = ['PUT'])
 # @auth.login_required
@@ -127,6 +136,7 @@ def update_circuits(circuit_id):
     circuit[0]['start_ip_address'] = request.json.get('start_ip_address', circuit[0]['start_ip_address'])
     circuit[0]['end_ip_address'] = request.json.get('end_ip_address', circuit[0]['end_ip_address'])
     circuit[0]['classifier'] = request.json.get('classifier', circuit[0]['classifier'])
+    circuit[0]['self'] = request.json.get('self', circuit[0]['self'])
     circuit[0]['active'] = request.json.get('active', circuit[0]['active'])
     return jsonify( { 'circuit': make_circuit(circuit[0]) } )
     
@@ -177,6 +187,7 @@ def compute_circuit_create():
         'service_type': request.json['service_type'],
         'start_ip_address': request.json.get('start_ip_address', ""),
         'end_ip_address': request.json.get('end_ip_address', ""),
+        'self': request.json.get('self', ""),
         'active': True
     }
     return jsonify( { 'circuit': make_circuits(circuits) } ), 201
@@ -198,7 +209,7 @@ Request methods using CURL:
  
 3. curl -i -u user:password -H "Content-Type: application/json" -X POST -d '{ "service_type": "epl", "start_ip_ address": "192.168.1.3", "end_ip_address": "192.168.1.4", "classifier": "red" }' http://localhost:5555/orchestrator/api/v1.0/circuits
  
-4. curl -i -u user:password -H "Content-Type: application/json" -X PUT -d '{"active":true}' http://localhost:5555/orchestrator/api/v1.0/circuits/2
+4. curl -i -u user:password -H "Content-Type: application/json" -X POST -d '{ "service_type": "epl", "start_ip_ address": "192.168.1.3", "end_ip_address": "192.168.1.4", "classifier": "red", "active": True }' http://localhost:5555/orchestrator/api/v1.0/circuits
  
 '''
 
