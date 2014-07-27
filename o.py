@@ -23,10 +23,12 @@ def get_password(username):
 def unauthorized():
     return make_response(jsonify( { 'error': 'Unauthorized access' } ), 403)
     # return 403 instead of 401 to prevent browsers from displaying the default auth dialog
-    
+'''    
+JT: This is a duplicate error handler
 @app.errorhandler(400)
 def not_found(error):
     return make_response(jsonify( { 'error': 'Bad request' } ), 400)
+    '''
  
 @app.errorhandler(404)
 def not_found(error):
@@ -75,12 +77,17 @@ def make_public_circuit(circuit):
 #	    print "field = ",field
             new_circuit[field] = circuit[field]
     return new_circuit
-    
-def make_circuit_metrics(id, latency, throughput):
+  
+'''
+JT: id is reserved
+  '''
+def make_circuit_metrics(idd, latency, throughput):
     new_metrics = {}
-    new_metrics['id'] = id
+    new_metrics['id'] = idd
     new_metrics['latency'] = latency
     new_metrics['throughput'] = throughput
+    new_metrics['latency_UnitMeasurement'] = "msec"
+    new_metrics['throughput_UnitMeasurement'] = "Mbit/sec"
     return new_metrics
 
 
@@ -170,12 +177,12 @@ def debug():
 @app.route('/orchestrator/api/v1.0/circuits/<int:circuit_id>', methods = ['PUT'])
 # @auth.login_required
 def update_circuits(circuit_id):
-    print "Create circuit"
+
     circuit = filter(lambda t: t['id'] == circuit_id, circuits)
     print "Find circuit"
     if len(circuit) == 0:
         abort(404)
-    print "Validate circuit data"
+#    print "Validate circuit data"
     '''
     if not request.json:
         abort(400)
@@ -187,7 +194,7 @@ def update_circuits(circuit_id):
         abort(400)
 
     '''
-    print "Update circuit data"
+#    print "Update circuit data"
     print_circuit(circuit)
 
     '''
@@ -233,7 +240,7 @@ def compute_faultmonitor_start(circuit_id, start_ip, end_ip):
     if len(circuit) == 0:
         abort(404)
     # ping_start (end_ip);
-    return jsonify( { 'status':'ok', 'result': true } )
+    return jsonify( { 'status':'ok', 'result': True } )
     
 @app.route('/compute/api/v1.0/performancemetrics/<int:circuit_id>', methods = ['GET'])
 # @auth.login_required
