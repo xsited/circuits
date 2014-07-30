@@ -8,6 +8,7 @@ import string
 
 toggle = 1
 toggle_pcmm = 1
+circuit_id = 1
 # consider refectoring with request http://docs.python-requests.org/en/latest/index.html
 
 class Error:
@@ -31,10 +32,21 @@ class RestfulAPI(object):
         self.auth = ''
         self.port = '8080'
 
+    def get_server(self, server):
+        return self.server
+
 
     def set_path(self, path):
 	#print path
         self.path = path
+
+#    def set_path(self, path, port):
+#        self.path = path
+#        self.port = port
+
+    def set_port(self, port):
+	#print port
+        self.port = port
 
     def use_creds(self):
     	u = self.auth is not None and len(self.auth) > 0
@@ -57,7 +69,7 @@ class RestfulAPI(object):
         return ret
 
     def post(self, data):
-        ret = self.rest_call(data, 'PUT')
+        ret = self.rest_call(data, 'POST')
         #ret = self.rest_call2(data, 'POST')
 	print ret[0], ret[1]
 	return ret
@@ -154,34 +166,37 @@ class Menu(object):
     def __init__(self):
         pass
 
+    def print_menu(self):
+        print (30 * '-')
+        print ("   MENU      ")
+        print (30 * '-')
+        print ("a. Openflow           ")
+        print ("b. Orchestration      ")
+        print ("c. Main               ")
+        print ("q. Quit               ")
 
-    def print_omenu(self):
+    def print_ormenu(self):
         print (30 * '-')
         print ("   ORCHESTRATION      ")
         print (30 * '-')
         print ("17. Hello             ")
         print ("18. Circuit Get All   ")
-        print ("19. Circuit Get one   ")
+        print ("19. Circuit Get One   ")
         print ("20. Circuit Add       ")
         print ("21. Circuit Update    ")
         print ("22. Circuit Delete    ")
-        print ("23. Circuit Remove    ")
-        print ("24.  List Flow Stats  ")
-        print ("25.  List Topology    ")
-        print ("26. List Flows        ")
-        print ("27. List Ports        ")
-        print ("28. Add PCMM Flow 1   ")
-        print ("29. Remove PCMM Flow 1")
-        print ("30. Add PCMM Flow 2   ")
-        print ("31. Remove PCMM Flow 2")
-        print ("32. Toggle PCCM Flows ")
+        print ("23. Circuit Remove All")
+        print ("24. Fault Monitor Service ")
+        print ("25. Performance Metrics")
+        print ("26. Compute Create    ")
+        print ("c. Main               ")
         print ("q. Quit               ")
 #        print (30 * '-')
 
 
-    def print_menu(self):
+    def print_ofmenu(self):
         print (30 * '-')
-        print ("   MENU               ")
+        print ("   OPENFLOW               ")
         print (30 * '-')
         print ("1.  Add Flow 1        ")
         print ("2.  Add Flow 2        ")
@@ -199,6 +214,7 @@ class Menu(object):
         print ("14. Add PCMM Flow 2   ")
         print ("15. Remove PCMM Flow 2")
         print ("16. Toggle PCCM Flows")
+        print ("c. Main               ")
         print ("q. Quit               ")
 #        print (30 * '-')
 
@@ -206,24 +222,12 @@ class Menu(object):
     def no_such_action(self):
         print "Invalid option!"
 
-    def run_o(self):
-        actions = {
-	"1": flow_add_1, 
-	"q": exit_app,
-	}
-
-        while True:
-            self.print_omenu()
-            selection = raw_input("Enter selection: ")
-            if "quit" == selection:
-                return
-            toDo = actions.get(selection, self.no_such_action)
-            toDo()
-
-
-class ODL(object):
     def run(self):
+	self.print_menu()
         actions = {
+	"a": self.print_ofmenu,
+	"b": self.print_ormenu,
+	"c": self.print_menu,
 	"1": flow_add_1, 
 	"2": flow_add_2, 
 	"3": flow_add_several, 
@@ -240,15 +244,28 @@ class ODL(object):
 	"14":flow_add_pc_2,
 	"15":flow_remove_pc_2,
 	"16":flow_toggle_pcmm,
+	"17":hello,
+	"18":orchestration_circuit_get_all,
+	"19":orchestration_circuit_get_one,
+	"20":orchestration_circuit_add,
+	"21":orchestration_circuit_update,
+	"22":orchestration_circuit_delete,
+	"23":orchestration_circuit_remove_all,
+	"24":compute_faultmonitor_service,
+	"25":compute_performance_metrics_get,
+	"26":compute_create_circuit,
 	"q": exit_app,
         }
+
         while True:
-            self.print_menu()
+            #self.print_ormenu()
             selection = raw_input("Enter selection: ")
             if "quit" == selection:
                 return
             toDo = actions.get(selection, self.no_such_action)
             toDo()
+
+
 
 
 class ODL(object):
@@ -257,12 +274,14 @@ class ODL(object):
 
     def topology(self):
         ws.set_path('/controller/nb/v2/topology/default')
+	ws.set_port(8080)	
         content = ws.get()
         j=json.loads(content[2])
         ws.show(j)
 
     def statistics_ports(self):
         ws.set_path('/controller/nb/v2/statistics/default/port')
+	ws.set_port(8080)	
         content = ws.get()
         allPortStats = json.loads(content[2])
 	# ws.show(allPortStats)
@@ -291,6 +310,7 @@ class ODL(object):
     # adopted from fredhsu @ http://fredhsu.wordpress.com/2013/04/25/getting-started-with-opendaylight-and-python/
     def statistics_flows(self):
         ws.set_path('/controller/nb/v2/statistics/default/flow')
+	ws.set_port(8080)	
         content = ws.get()
         allFlowStats = json.loads(content[2])
 
@@ -322,6 +342,7 @@ class ODL(object):
 
     def flowprogrammer_list(self):
         ws.set_path('/controller/nb/v2/flowprogrammer/default')
+	ws.set_port(8080)	
         content = ws.get()
         j=json.loads(content[2])
         ws.show(j)
@@ -332,6 +353,7 @@ class ODL(object):
     def flowprogrammer_add(self, flow):
         # http://localhost:8080/controller/nb/v2/flowprogrammer/default/node/OF/00:00:00:00:00:00:00:01/staticFlow/flow1
         ws.set_path('/controller/nb/v2/flowprogrammer/default/node/' + flow['node']['type'] + '/' + flow['node']['id'] + '/staticFlow/' + flow['name'] )
+	ws.set_port(8080)	
         ws.show(flow)
         content = ws.set(flow)
         #print content
@@ -350,6 +372,7 @@ class ODL(object):
 
     def flowprogrammer_remove(self, flow):
         ws.set_path('/controller/nb/v2/flowprogrammer/default/node/' + flow['node']['type'] + '/' + flow['node']['id'] + '/staticFlow/' + flow['name'] )
+	ws.set_port(8080)	
         content = ws.remove("", flow)
 
 	flowdelete_reponse_codes = {
@@ -382,6 +405,7 @@ class OClient(object):
     # curl -i -u user:password http://localhost:5555/orchestrator/api/v1.0/hello
     def o_hello(self):
 	ws.set_path('/orchestrator/api/v1.0/hello')	
+	ws.set_port(5555)	
 	content = ws.get()
         j=json.loads(content[2])
         ws.show(j)
@@ -389,14 +413,19 @@ class OClient(object):
 
     # curl -i -u user:password http://localhost:5555/orchestrator/api/v1.0/circuits
     def o_circuit_get_all(self):
-	ws.set_path('http://localhost:5555/orchestrator/api/v1.0/circuits')
+	ws.set_path('/orchestrator/api/v1.0/circuits')
+	ws.set_port(5555)	
 	content = ws.get()
         j=json.loads(content[2])
         ws.show(j)
  
     # curl -i -u user:password http://localhost:5555/orchestrator/api/v1.0/circuits/2
-    def o_circuit_get(self, id):
-	ws.set_path('/orchestrator/api/v1.0/circuits')
+    def o_circuit_get(self, circuit_id):
+	ws.set_path('/orchestrator/api/v1.0/circuits/' + circuit_id)
+	ws.set_port(5555)	
+	content = ws.get()
+        j=json.loads(content[2])
+        ws.show(j)
 
     # curl -i -u user:password -H "Content-Type: application/json" -X POST -d '
     #	  {  
@@ -407,15 +436,10 @@ class OClient(object):
     #    "self": "http://localhost:8888/service_id/1" 
     #    } 
     #    http://localhost:5555/orchestrator/api/v1.0/circuits
-    circuit1 = {  
-          "service_type": "epl", 
-          "start_ip_address": "192.168.1.3", 
-     	  "end_ip_address": "192.168.1.4", 
-     	  "classifier": "red", 
-          "self": "http://localhost:8888/service_id/1" 
-	}
     def o_circuit_create(self, circuit):
         ws.set_path('/orchestrator/api/v1.0/circuits')
+	ws.set_port(5555)	
+        ws.show(circuit)
 	content = ws.post(circuit)
         j=json.loads(content[2])
         ws.show(j)
@@ -430,39 +454,79 @@ class OClient(object):
     #	  "active": true 
     #	}
     #    ' http://localhost:5555/orchestrator/api/v1.0/circuits/1
-    circuit2 = { 
-	        "service_type": "epl", 
-	        "start_ip_address": "192.168.1.3", 
-	        "end_ip_address": "192.168.1.4", 
-	        "classifier": "blue", 
-	        "self": "http://localhost:8888/service_id/1", 
-	        "active": True 
-    }
-    def o_circuit_update(self, id, circuit):
-        ws.set_path('/orchestrator/api/v1.0/circuits/' + id)
+    def o_circuit_update(self, circuit_id, circuit):
+        ws.set_path('/orchestrator/api/v1.0/circuits/' + circuit_id)
+	ws.set_port(5555)	
 	content = ws.put(circuit)
         j=json.loads(content[2])
         ws.show(j)
 
-    def o_circuit_delete(self, id):
-        ws.set_path('/orchestrator/api/v1.0/circuits/' + id)
-	content = ws.delete()
+    def o_circuit_delete(self, circuit_id):
+        ws.set_path('/orchestrator/api/v1.0/circuits/' + circuit_id)
+	ws.set_port(5555)	
+	content = ws.remove("",circuit1)
         j=json.loads(content[2])
         ws.show(j)
 
 
-    # curl -i  -H "Content-Type: application/json" -X PUT -d '{"start_ip_address":"2.2.2.2","self":"http://local/1","end_ip_address":"1.1.1.1","service_type":"vepl","classifier":"11","active":true}' http://localhost:5555/orchestrator/api/v1.0/circuits/1
+    # curl -i  -H "Content-Type: application/json" -X PUT -d '{"start_ip_address":"2.2.2.2","self":"http://local/1","end_ip_address":"1.1.1.1","service_type":"vepl","classifier":"11","active":true}' http://localhost:5555/compute/api/v1.0/circuits/1
+    def c_circuit_create_on_server(self, circuit, server):
+        ws.set_path('/compute/api/v1.0/circuits')
+	ws.set_port(5555)	
+    	temp_server=ws.get_server()
+    	ws.set_server("http://" + server )
+        ws.show(circuit)
+	content = ws.post(circuit)
+        j=json.loads(content[2])
+        ws.show(j)
+    	ws.set_server(temp_server)
 
     # curl -i  -H "Content-Type: application/json" -X PUT -d '{"active":true}' http://localhost:5555/orchestrator/api/v1.0/circuits/1
 
-    def compute_faultdetection(self, on):
-        ws.set_path('/controller/nb/v2/topology/default')
+    def c_faultdetection_service(self, on):
+        ws.set_path('/compute/api/v1.0/faultmonitor/<int:circuit_id>')
+	ws.set_port(5555)	
         content = ws.get()
         j=json.loads(content[2])
         ws.show(j)
 
+    def c_performance_metrics_get(self,circuit_id):
+        ws.set_path('/compute/api/v1.0/performancemetrics/<int:circuit_id>')
+	ws.set_port(5555)	
+        content = ws.get()
+        j=json.loads(content[2])
+        ws.show(j)
+
+
+
+
 # XXX - do not use underscores and dashes in flow names.
 # XXX - ingress ports that possibly don't exist ? throw configuration errors
+circuit1 = {  
+          "service_type": "epl", 
+          "start_ip_address": "192.168.1.3", 
+     	  "end_ip_address": "192.168.1.4", 
+     	  "classifier": "red", 
+          "self": "http://localhost:8888/service_id/1" 
+}
+
+circuit2 = { 
+	  "service_type": "epl", 
+	  "start_ip_address": "192.168.1.3", 
+	  "end_ip_address": "192.168.1.4", 
+	  "classifier": "blue", 
+	  "self": "http://localhost:8888/service_id/1", 
+	  "active": True 
+}
+
+circuit3 = { 
+	  "service_type": "epl", 
+	  "start_ip_address": "10.0.0.133", 
+	  "end_ip_address": "10.0.0.134", 
+	  "classifier": "blue", 
+	  "self": "http://localhost:8888/service_id/1", 
+	  "active": True 
+}
 
 flow1 = {
         "actions": [
@@ -718,16 +782,72 @@ def exit_app():
     print "Quit           "
     exit(0)
 
+def orchestration_circuit_get_all():
+    print "Orchestration Get All Circuits"
+    oc.o_circuit_get_all()
+
+def orchestration_circuit_get_one():
+    print "Orchestration Get One"
+    circuit_id = raw_input("Enter circuit id: ")
+    if "quit" == circuit_id:
+         return
+    oc.o_circuit_get(circuit_id)
+    
+
+
+def orchestration_circuit_add():
+    print "Orchestration Circuit Add"
+    global circuit1
+    circuit_id1=oc.o_circuit_create(circuit1)
+
+def orchestration_circuit_update():
+    print "Orchestration Circuit Update"
+    global circuit1
+    global circuit2
+    global circuit_id1
+    circuit_id = raw_input("Enter circuit id: ")
+    if "quit" == circuit_id:
+         return
+    oc.o_circuit_update(circuit_id, circuit2)
+
+def orchestration_circuit_delete():
+    print "Orchestration Circuit Delete"
+    circuit_id = raw_input("Enter circuit id: ")
+    if "quit" == circuit_id:
+         return
+    oc.o_circuit_delete(circuit_id)
+
+def orchestration_circuit_remove_all():
+    print "Orchestration Circuit Remove All"
+
+def compute_faultdetection_service():
+    print "Compute Fault Service"
+    onoff = raw_input("Enter on = 1 or off = 0: ")
+    if "quit" == onoff:
+         return
+    oc.c_faultdetection_service(onoff)
+
+def compute_performance_metrics_get():
+    print "Performance  Metrics"
+    oc.c_performance_metrics_get(circuit_id)
+
+def compute_create_circuit():
+    print "Create Circuit"
+    oc.c_circuit_create_on_server(circuit3, circuit3['start_ip_address'])
+    oc.c_circuit_create_on_server(circuit3, circuit3['end_ip_address'])
+
+def hello():
+    oc.o_hello()
+
+
 if __name__ == "__main__":
     ws = RestfulAPI('127.0.0.1')
     #ws = RestfulAPI('192.168.56.10')
     ws.credentials('admin', 'admin')
+    odl = ODL()
     oc = OClient()
     menu=Menu()
-    menu.run_o()
-#    odl = ODL()
-#    menu=Menu()
-#    menu.run()
+    menu.run()
     exit(0)
 
 

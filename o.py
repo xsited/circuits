@@ -7,12 +7,29 @@ pip install flask Flask-HTTPAuth
 
 '''
 
+import os
+import time
+import json
+import argparse
+import datetime
+from restapi import OClient
+
+import subprocess as subps
+
 from flask import Flask, jsonify, abort, request, make_response, url_for
 from flask.ext.httpauth import HTTPBasicAuth
  
+class oTimeout(Exception):
+    pass
+
+class oError(Exception):
+    pass
+ 
+
 app = Flask(__name__, static_url_path = "")
 auth = HTTPBasicAuth()
- 
+oc = OClient()
+
 @auth.get_password
 def get_password(username):
     if username == 'user':
@@ -23,12 +40,9 @@ def get_password(username):
 def unauthorized():
     return make_response(jsonify( { 'error': 'Unauthorized access' } ), 403)
     # return 403 instead of 401 to prevent browsers from displaying the default auth dialog
-'''    
-JT: This is a duplicate error handler
 @app.errorhandler(400)
 def not_found(error):
     return make_response(jsonify( { 'error': 'Bad request' } ), 400)
-    '''
  
 @app.errorhandler(404)
 def not_found(error):
@@ -59,6 +73,113 @@ circuits = [
 
 ]
  
+
+
+def c_circuit_add(circuit_id,start_ip, end_ip, circuit_type='gre'):
+    '''
+    Configure circuit can be confgured at a couple different ReSTful RPC levels
+    Option 1:
+	Custom RPC - Call a custom RPC to configure the circuit
+    Option 2:
+    	Call OVSDB json-rpc  ovsdb.py is a PoC of this interface
+    Option 3:
+	ODL ReSTful NB rpc (which calls SB ODL OVSDB) -  need example
+    Option 4:
+	Openstack Neutron ML2 rpc - need example
+
+    circuit_type currently is an enum of possibile implmenetation types
+    gre
+    vxlan
+    
+  
+    The endpoints should be addressed by management interfaces so status reporting is possble when link is down
+    start_ip = 10.0.0.133
+    end_ip = 10.0.0.134
+    '''
+
+    mylist = start_ip.split(".",4)
+    start_host = mylist[3]
+    print "start_host = %s" % start_host
+    mylist = end_ip.split(".",4)
+    end_host = mylist[3]
+    print "end_host = %s" % end_host
+    tunnel_start_ip="192.168.222." + start_host
+    print "tunnel_start_ip = %s" % tunnel_start_ip
+    tunnel_end_ip="192.168.222." + end_host
+    print "tunnel_end_ip = %s" % tunnel_end_ip
+    data_start_ip="10.0.0." + start_host
+    print "data_start_ip = %s" % data_start_ip
+    data_end_ip="10.0.0." + end_host
+    print "data_end_ip = %s" % data_end_ip
+     
+
+     
+    '''
+    This is the tunnel addressing assumed configuration
+    ovs-vsctl add-br isolated0
+    #ifconfig isolated0 192.168.222.133 up
+    ifconfig isolated0 tunnel_start_ip up
+    # steal eth2 from default openstack configuration (optional and internal note)
+    # ovs-vsctl del-port br-eth2 eth2
+
+    # ovs-vsctl add-port isolated0 eth2
+    cpe_interface='gre0'
+    ovs-vsctl add-port isolated0 cpe_interface
+    '''
+ 
+    if circuit_type == 'gre':
+        ovscfg_sh = '\
+#!/bin/bash\n\
+S=$1\n\
+R=$2\n\
+ovs-vsctl del-port gre0 \n\
+ovs-vsctl add-port isolated0 gre0 -- set interface gre0 type=gre options:remote_ip=$R\n\
+'
+
+          #ovs-vsctl -vjsonrpc add-port isolated0 gre0 -- set interface gre0 type=gre options:remote_ip=10.36.0.134
+    else:
+        ovscfg_sh = '\
+#!/bin/bash\n\
+S=$1\n\
+R=$2\n\
+ovs-vsctl del-port vxlan \n\
+ovs-vsctl add-port isolated0 vxlan -- set interface vxlan type=vxlan options:key=10 options:local_ip=$L options:remote_ip=$R\n\
+'
+
+    with open('/tmp/ovscfg.sh', 'w') as f:
+    	f.write(ovscfg_sh)
+
+    cmd = "screen -m -d /bin/bash /tmp/ovscfg.sh %s %s" % (data_start_ip, data_end_ip)
+    if subps.call(cmd.split(), stderr=file('ovscfg.err', 'w')):
+        raise oError()
+
+    
+'''
+    rpc_faultmonitor_start(circuit_id, interface, end_ip_address);
+    	 # ping -I isolated0 192.168.222.134
+         ping -I interface end_ip_address
+
+
+    ovs-vsctl add-br isolated0
+    ifconfig isolated0 192.168.222.134 up
+
+    # steal eth2 from default openstack configuration (optional and internal note)
+    # ovs-vsctl del-port br-eth2 eth2
+
+    ovs-vsctl add-port isolated0 eth2
+
+    if circuit_type == 'gre':
+    	# ovs-vsctl -vjsonrpc add-port isolated0 gre0 -- set interface gre0 type=gre options:remote_ip=10.36.0.133
+        ovs-vsctl add-port isolated0 gre0 -- set interface gre0 type=gre options:remote_ip=10.36.0.133
+    else:
+        ovs-vsctl add-port isolated0 vxlan -- set interface vxlan type=vxlan options:key=10 options:local_ip=192.168.222.134 options:remote_ip=10.36.0.133
+
+    rpc_faultmonitor_start(circuit_id, interface, end_ip_address);
+         # ping -I isolated0 192.168.222.133
+         ping -I interface end_ip_address
+
+'''
+
 def print_circuit(circuit):
     print "service_type = %s" % circuit[0]['service_type']
     print "start_ip_address = %s" % circuit[0]['start_ip_address']
@@ -81,9 +202,9 @@ def make_public_circuit(circuit):
 '''
 JT: id is reserved
   '''
-def make_circuit_metrics(idd, latency, throughput):
+def make_circuit_metrics(circuit_id, latency, throughput):
     new_metrics = {}
-    new_metrics['id'] = idd
+    new_metrics['id'] = circuit_id
     new_metrics['latency'] = latency
     new_metrics['throughput'] = throughput
     new_metrics['latency_UnitMeasurement'] = "msec"
@@ -128,34 +249,11 @@ def create_circuit():
     }
     print "Append circuit"
     circuits.append(circuit)
-    '''
-    # Call OVSDB json-rpc  to configure TEP
-  
-    rpc_ovsdb_create_tep()	
-    Compute node:
-    start_ip = 192.168.1.182
-    end_ip = 192.168.1.183
+    
+    print "Call computes to create circuit"
+    oc.c_circuit_create_on_server(circuit, circuit['start_ip_address'])
+    oc.c_circuit_create_on_server(circuit, circuit['end_ip_address'])
 
-    ovs-vsctl add-br isolated0
-    ifconfig isolated0 192.168.222.2 up
-    ovs-vsctl -vjsonrpc add-port isolated0 gre0 -- set interface gre0 type=gre options:remote_ip=10.36.0.134
-    # ovs-vsctl add-port isolated0 vxlan -- set interface vxlan type=vxlan options:key=10 options:local_ip=192.168.222.1 options:remote_ip=10.36.0.133
-    ovs-vsctl del-port br-eth2 eth2
-    ovs-vsctl add-port isolated0 eth2
-    ping -I isolated0 192.168.222.1
-
-    ovs-vsctl add-br isolated0
-    ifconfig isolated0 192.168.222.1 up
-    ovs-vsctl -vjsonrpc add-port isolated0 gre0 -- set interface gre0 type=gre options:remote_ip=10.36.0.133
-    # ovs-vsctl add-port isolated0 vxlan -- set interface vxlan type=vxlan options:key=10 options:local_ip=192.168.222.2 options:remote_ip=10.36.0.134
-    ovs-vsctl del-port br-eth2 eth2
-    ovs-vsctl add-port isolated0 eth2
-    ping -I isolated0 192.168.222.2
-
-    json-rpc client call
-    rpc_faultmonitor_start(id, start_ip_address, end_ip_address);
-
-    '''
     print "Return circuit"
     return jsonify( { 
 	'status': 'ok',
@@ -250,8 +348,6 @@ def compute_performance_metrics_get(circuit_id):
         abort(404)
     return jsonify( { 'status':'ok', 'metrics': make_circuit_metrics(circuit_id, latency, throughput) } ), 201
     
-'''
-Not needed at the moment ovsdb
 
 @app.route('/compute/api/v1.0/circuits', methods = ['POST'])
 # @auth.login_required
@@ -267,8 +363,13 @@ def compute_circuit_create():
         'classifier': request.json.get('classifier', ""),
         'active': True
     }
+    if request.host == circuit['start_ip_address']:
+        c_circuit_add(circuit['id'], circuit['start_ip_address'], circuit['end_ip_address'])
+    else:
+        c_circuit_add(circuit['id'], circuit['end_ip_address'], circuit['start_ip_address'])
+        
+    #c_circuit_add(circuit['id'],end_ip_address, start_ip_address)
     return jsonify( { 'status':'ok', 'result':circuit['id'], 'circuit': make_circuits(circuits) } ), 201
-'''
 
     
 if __name__ == '__main__':
