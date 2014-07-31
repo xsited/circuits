@@ -8,6 +8,7 @@ pip install flask Flask-HTTPAuth
 '''
 
 import os
+import sys
 import time
 import json
 import argparse
@@ -16,8 +17,22 @@ from restapi import OClient
 
 import subprocess as subps
 
-from flask import Flask, jsonify, abort, request, make_response, url_for
-from flask.ext.httpauth import HTTPBasicAuth
+try:
+    from flask import Flask, jsonify, abort, request, make_response, url_for
+except ImportError:
+    print 'You will need the Flask python module installed to use this script'
+    print 'You can install it using the following command'
+    print 'sudo pip install Flask'
+    sys.exit(1)
+
+try:
+    from flask.ext.httpauth import HTTPBasicAuth
+except ImportError:
+    print 'You will need the HTTPBasicAuth python module installed to use this script'
+    print 'You can install it using the following command'
+    print 'sudo pip install Flask-HTTPAuth'
+    sys.exit(1)
+
  
 class oTimeout(Exception):
     pass
@@ -371,9 +386,69 @@ def compute_circuit_create():
     #c_circuit_add(circuit['id'],end_ip_address, start_ip_address)
     return jsonify( { 'status':'ok', 'result':circuit['id'], 'circuit': make_circuits(circuits) } ), 201
 
+def get_root():
+    print 'This script needs to run as root. Please provide your sudo password'
+    args = ['sudo', sys.executable] + sys.argv + [os.environ]
+    os.execlpe('sudo', *args)
+    return os.getuid()
+
+
+def parse_options():
+    parser = argparse.ArgumentParser(prog='o.py', description='ReSTFul ochestrator to create circuit')
+    parser.add_argument('-q', '--quite', action='store_true',
+                        help='Quite mode, update the terminal only when there is a timeout')
+    parser.add_argument('-c', '--compute', action='store_true',
+                        help='Perform Compute role')
+    parser.add_argument('-d', '--daemonize', action='store_true',
+                        help='Run the process in the background as a daemon ')
+    args = parser.parse_args()
+    return args
+
+
     
-if __name__ == '__main__':
+def main():
+    options = parse_options()
+    uid = os.getuid()
+    # print 'UserID = ', uid
+    if uid != 0:
+        print 'Failed to get root permissions. Exiting!'
+        print 'You need to run as root to set command and open raw sockets'
+        print 'sudo python o.py'
+        sys.exit(1)
+
+    #   uid = get_root()
+    #   if uid != 0:
+    #       print 'Failed to get root permissions. Exiting!'
+    #       sys.exit(1)
+
+    if options.daemonize and not daemonize:
+        print 'You do not have the necessary library run in daemon mode'
+        print 'Install the library using the following command'
+        print 'sudo pip install daemonize'
+        sys.exit(1)
+
     app.run('0.0.0.0', 5555, debug=True)
+
+
+def ping_endpoint():
+    if options.daemonize:
+        options.notify = True
+        pingLoop = PingLoop(options)
+        daemon = daemonize.Daemonize(app='check_circuit', pid='/tmp/check_circuit.pid', action=pingLoop.runPingLoop)
+        daemon.start()
+    else:
+        if options.quite:
+            print('Running in quite mode, will update when a timeout occurs')
+
+        pingLoop = PingLoop(options)
+        pingLoop.runPingLoop()
+
+
+if __name__ == '__main__':
+    main()
+
+#if __name__ == '__main__':
+#    app.run('0.0.0.0', 5555, debug=True)
 
 
 '''
