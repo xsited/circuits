@@ -90,6 +90,28 @@ circuits = [
  
 
 
+def c_circuit_delete(circuit_id,start_ip, end_ip, circuit_type='gre'):
+    if circuit_type == 'gre':
+        ovscfg_sh = '\
+#!/bin/bash\n\
+ovs-vsctl del-port gre0 \n\
+'
+
+    else:
+        ovscfg_sh = '\
+#!/bin/bash\n\
+ovs-vsctl del-port vxlan \n\
+'
+
+    with open('/tmp/ovscfg.sh', 'w') as f:
+    	f.write(ovscfg_sh)
+
+    cmd = "/bin/bash /tmp/ovscfg.sh %s %s" % (data_start_ip, data_end_ip)
+    if subps.call(cmd.split(), stderr=file('ovscfg.err', 'w')):
+        raise oError()
+
+
+    
 def c_circuit_add(circuit_id,start_ip, end_ip, circuit_type='gre'):
     '''
     Configure circuit can be confgured at a couple different ReSTful RPC levels
@@ -164,7 +186,8 @@ ovs-vsctl add-port isolated0 vxlan -- set interface vxlan type=vxlan options:key
     with open('/tmp/ovscfg.sh', 'w') as f:
     	f.write(ovscfg_sh)
 
-    cmd = "screen -m -d /bin/bash /tmp/ovscfg.sh %s %s" % (data_start_ip, data_end_ip)
+    #cmd = "screen -m -d /bin/bash /tmp/ovscfg.sh %s %s" % (data_start_ip, data_end_ip)
+    cmd = "/bin/bash /tmp/ovscfg.sh %s %s" % (data_start_ip, data_end_ip)
     if subps.call(cmd.split(), stderr=file('ovscfg.err', 'w')):
         raise oError()
 
@@ -383,8 +406,25 @@ def compute_circuit_create():
     else:
         c_circuit_add(circuit['id'], circuit['end_ip_address'], circuit['start_ip_address'])
         
-    #c_circuit_add(circuit['id'],end_ip_address, start_ip_address)
-    return jsonify( { 'status':'ok', 'result':circuit['id'], 'circuit': make_circuits(circuits) } ), 201
+    return jsonify( { 
+	'status': 'ok',
+        'id': circuit['id'],
+	'circuit': make_public_circuit(circuit) 
+	}
+	), 201
+ 
+@app.route('/compute/api/v1.0/circuits', methods = ['DELETE'])
+# @auth.login_required
+def compute_circuit_delete(circuit_id):
+    circuit = filter(lambda t: t['id'] == circuit_id, circuits)
+    if len(circuit) == 0:
+        abort(404)
+    circuits.remove(circuit[0])
+    c_circuit_delete(circuit['id'], circuit['end_ip_address'], circuit['start_ip_address'])
+    return jsonify( { 'status':'ok','result': circuit[0]['id'] } )
+    
+ 
+
 
 def get_root():
     print 'This script needs to run as root. Please provide your sudo password'
