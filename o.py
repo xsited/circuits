@@ -140,11 +140,13 @@ def c_circuit_add(circuit_id,start_ip, end_ip, circuit_type='gre'):
     print "tunnel_start_ip = %s" % tunnel_start_ip
     tunnel_end_ip="192.168.222." + end_host
     print "tunnel_end_ip = %s" % tunnel_end_ip
-    data_start_ip="10.0.0." + start_host
+    data_start_ip="10.36.0." + start_host
     print "data_start_ip = %s" % data_start_ip
-    data_end_ip="10.0.0." + end_host
+    data_end_ip="10.36.0." + end_host
     print "data_end_ip = %s" % data_end_ip
      
+
+    print "Remote Server = ", end_ip
 
      
     '''
@@ -400,7 +402,9 @@ def compute_circuit_create():
         'classifier': request.json.get('classifier', ""),
         'active': True
     }
-    if request.host == circuit['start_ip_address']:
+    #if request.host == circuit['start_ip_address']:
+    myserver = request.host.split(":",2)
+    if myserver[0] == circuit['start_ip_address']:
         c_circuit_add(circuit['id'], circuit['start_ip_address'], circuit['end_ip_address'])
     else:
         c_circuit_add(circuit['id'], circuit['end_ip_address'], circuit['start_ip_address'])
