@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-__author__ = 'xisted'
+__author__ = 'xsited'
 import httplib
 import json
 import base64
@@ -30,10 +30,13 @@ class RestfulAPI(object):
         self.server = server
         self.path = '/wm/staticflowentrypusher/json'
         self.auth = ''
-        self.port = '8080'
+        self.port = 8080
 
-    def get_server(self, server):
+    def get_server(self):
         return self.server
+
+    def set_server(self, server):
+        self.server = server
 
 
     def set_path(self, path):
@@ -108,7 +111,7 @@ class RestfulAPI(object):
         #conn = httplib.HTTPConnection(self.server, self.port)
         conn = httplib.HTTP(self.server, self.port)
         conn.putrequest(action, self.path)
-	conn.putheader("Host", self.server+':'+self.port)
+	conn.putheader("Host", self.server+':%s'%self.port)
  	conn.putheader("User-Agent", "Python HTTP Auth")
         conn.putheader('Content-type', 'application/json')
         body = json.dumps(data)
@@ -152,6 +155,7 @@ class RestfulAPI(object):
 		'Content-length': "%d" % len(body),
                 }
 		
+	print self.server+':',self.port, self.path
         conn = httplib.HTTPConnection(self.server, self.port)
         conn.request(action, self.path, body, headers)
         response = conn.getresponse()
@@ -189,6 +193,8 @@ class Menu(object):
         print ("24. Fault Monitor Service ")
         print ("25. Performance Metrics")
         print ("26. Compute Create    ")
+	print ("27. Compute Delete    ")
+        print ("28. Compute Ping      ")
         print ("c. Main               ")
         print ("q. Quit               ")
 #        print (30 * '-')
@@ -251,9 +257,11 @@ class Menu(object):
 	"21":orchestration_circuit_update,
 	"22":orchestration_circuit_delete,
 	"23":orchestration_circuit_remove_all,
-	"24":compute_faultmonitor_service,
+	"24":compute_faultdetection_service,
 	"25":compute_performance_metrics_get,
 	"26":compute_create_circuit,
+	"27":compute_delete_circuit,
+	"28":compute_ping,
 	"q": exit_app,
         }
 
@@ -474,13 +482,38 @@ class OClient(object):
         ws.set_path('/compute/api/v1.0/circuits')
 	ws.set_port(5555)	
     	temp_server=ws.get_server()
-    	ws.set_server("http://" + server )
+    	print "Temp Server = ", temp_server
+    	ws.set_server( server )
+    	print "Server = ", ws.get_server()
         ws.show(circuit)
 	content = ws.post(circuit)
         j=json.loads(content[2])
         ws.show(j)
     	ws.set_server(temp_server)
 
+    def c_circuit_delete_on_server(self, circuit_id, server):
+        ws.set_path('/compute/api/v1.0/circuits/' + circuit_id)
+	ws.set_port(5555)	
+    	temp_server=ws.get_server()
+    	ws.set_server( server )
+	content = ws.remove("",circuit1)
+        j=json.loads(content[2])
+        ws.show(j)
+    	ws.set_server(temp_server)
+
+    def c_hello(self, server):
+	ws.set_path('/orchestrator/api/v1.0/hello')	
+	ws.set_port(5555)	
+    	temp_server=ws.get_server()
+    	ws.set_server( server )
+	content = ws.get()
+        j=json.loads(content[2])
+        ws.show(j)
+    	ws.set_server(temp_server)
+
+
+
+    # curl -i  -H "Content-Type: application/json" -X PUT -d '{"active":true}' http://localhost:5555/orchestrator/api/v1.0/circuits/1
     # curl -i  -H "Content-Type: application/json" -X PUT -d '{"active":true}' http://localhost:5555/orchestrator/api/v1.0/circuits/1
 
     def c_faultdetection_service(self, on):
@@ -519,14 +552,6 @@ circuit2 = {
 	  "active": True 
 }
 
-circuit3 = { 
-	  "service_type": "epl", 
-	  "start_ip_address": "10.0.0.133", 
-	  "end_ip_address": "10.0.0.134", 
-	  "classifier": "blue", 
-	  "self": "http://localhost:8888/service_id/1", 
-	  "active": True 
-}
 
 flow1 = {
         "actions": [
@@ -831,10 +856,32 @@ def compute_performance_metrics_get():
     print "Performance  Metrics"
     oc.c_performance_metrics_get(circuit_id)
 
+circuit3 = { 
+	  "service_type": "epl", 
+	  "start_ip_address": "10.0.0.133", 
+	  "end_ip_address": "10.0.0.134", 
+	  "classifier": "blue", 
+	  "self": "http://localhost:8888/service_id/1", 
+	  "active": True 
+}
+
+def compute_ping():
+    print "Compute Create Circuit"
+    oc.c_hello(circuit3['start_ip_address'])
+    oc.c_hello(circuit3['end_ip_address'])
+
 def compute_create_circuit():
-    print "Create Circuit"
+    print "Compute Create Circuit"
     oc.c_circuit_create_on_server(circuit3, circuit3['start_ip_address'])
     oc.c_circuit_create_on_server(circuit3, circuit3['end_ip_address'])
+
+def compute_delete_circuit():
+    print "Compute Delete Circuit"
+    circuit_id = raw_input("Enter circuit id: ")
+    if "quit" == circuit_id:
+         return
+    oc.c_circuit_delete_on_server(circuit_id, circuit3['start_ip_address'])
+    oc.c_circuit_delete_on_server(circuit_id, circuit3['end_ip_address'])
 
 def hello():
     oc.o_hello()
