@@ -1,10 +1,6 @@
 #!/usr/bin/env python
 
 '''
-
-
-pip install flask Flask-HTTPAuth
-
 '''
 
 import os
@@ -359,8 +355,8 @@ def delete_circuits(circuit_id):
     if len(circuit) == 0:
         abort(404)
     print "Call computes to delete circuit"
-    oc.c_circuit_delete_on_server(circuit_id, circuit['start_ip_address'])
-    oc.c_circuit_delete_on_server(circuit_id, circuit['end_ip_address'])
+    oc.c_circuit_delete_on_server(circuit_id, circuit[0]['start_ip_address'])
+    oc.c_circuit_delete_on_server(circuit_id, circuit[0]['end_ip_address'])
     circuits.remove(circuit[0])
     return jsonify( { 'status':'ok','result': circuit[0]['id'] } )
     
