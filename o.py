@@ -93,20 +93,20 @@ circuits = [
 def c_circuit_delete(circuit_id,start_ip, end_ip, circuit_type='gre'):
     if circuit_type == 'gre':
         ovscfg_sh = '\
-#!/bin/bash\n\
+#!/bin/bash\n\n\
 ovs-vsctl del-port gre0 \n\
 '
 
     else:
         ovscfg_sh = '\
-#!/bin/bash\n\
+#!/bin/bash\n\n\
 ovs-vsctl del-port vxlan \n\
 '
 
     with open('/tmp/ovscfg.sh', 'w') as f:
     	f.write(ovscfg_sh)
 
-    cmd = "/bin/bash /tmp/ovscfg.sh %s %s" % (data_start_ip, data_end_ip)
+    cmd = "/bin/bash /tmp/ovscfg.sh" # %s %s" % (data_start_ip, data_end_ip)
     if subps.call(cmd.split(), stderr=file('ovscfg.err', 'w')):
         raise oError()
 
@@ -246,7 +246,7 @@ def make_circuit_metrics(circuit_id, latency, throughput):
     new_metrics['latency'] = latency
     new_metrics['throughput'] = throughput
     new_metrics['latency_UnitMeasurement'] = "msec"
-    new_metrics['throughput_UnitMeasurement'] = "Mbit/sec"
+    new_metrics['throughput_UnitMeasurement'] = "Mbps"
     return new_metrics
 
 
@@ -358,6 +358,9 @@ def delete_circuits(circuit_id):
     circuit = filter(lambda t: t['id'] == circuit_id, circuits)
     if len(circuit) == 0:
         abort(404)
+    print "Call computes to delete circuit"
+    oc.c_circuit_delete_on_server(circuit_id, circuit['start_ip_address'])
+    oc.c_circuit_delete_on_server(circuit_id, circuit['end_ip_address'])
     circuits.remove(circuit[0])
     return jsonify( { 'status':'ok','result': circuit[0]['id'] } )
     
@@ -406,6 +409,7 @@ def compute_circuit_create():
     else:
         c_circuit_add(circuit['id'], circuit['end_ip_address'], circuit['start_ip_address'])
         
+    circuits.append(circuit)
     return jsonify( { 
 	'status': 'ok',
         'id': circuit['id'],
@@ -413,14 +417,14 @@ def compute_circuit_create():
 	}
 	), 201
  
-@app.route('/compute/api/v1.0/circuits', methods = ['DELETE'])
+@app.route('/compute/api/v1.0/circuits/<int:circuit_id>', methods = ['DELETE'])
 # @auth.login_required
 def compute_circuit_delete(circuit_id):
     circuit = filter(lambda t: t['id'] == circuit_id, circuits)
     if len(circuit) == 0:
         abort(404)
+    c_circuit_delete(circuit_id, circuit[0]['end_ip_address'], circuit[0]['start_ip_address'])
     circuits.remove(circuit[0])
-    c_circuit_delete(circuit['id'], circuit['end_ip_address'], circuit['start_ip_address'])
     return jsonify( { 'status':'ok','result': circuit[0]['id'] } )
     
  
@@ -508,7 +512,7 @@ Request methods using CURL:
 
 6. curl -i  -H "Content-Type: application/json" -X PUT -d '{"active":true}' http://localhost:5555/orchestrator/api/v1.0/circuits/1
 
-7. curl -i -u user:password http://localhost:5555//orchestrator/api/v1.0/performancemetrics/2
+7. curl -i -u user:password http://localhost:5555/orchestrator/api/v1.0/performancemetrics/2
 
 8. curl -i -u user:password  -H "Content-Type: application/json" -X DELETE http://localhost:5555/orchestrator/api/v1.0/circuits/2
 
