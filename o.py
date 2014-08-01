@@ -256,6 +256,13 @@ def make_public_circuit(circuit):
             new_circuit[field] = circuit[field]
     return new_circuit
   
+def make_circuit_status(circuit_id, active):
+    new_status = {}
+    if active:
+        new_status['status'] = "running"
+    else:
+        new_status['status'] = "suspended"
+
 '''
 JT: id is reserved
   '''
@@ -308,10 +315,10 @@ def create_circuit():
     circuits.append(circuit)
     
     print "Call computes to create circuit"
-    c_circuit = circuit
-    c_circuit['self']='http://10.0.0.192:5555/orchstrator/api/v1.0/faultmonitor/',  circuit['id']
-    oc.c_circuit_create_on_server(c_circuit, c_circuit['start_ip_address'])
-    oc.c_circuit_create_on_server(c_circuit, c_circuit['end_ip_address'])
+    #c_circuit = dict(circuit)
+    #c_circuit['self']='http://10.0.0.192:5555/orchstrator/api/v1.0/reportstatus/%d'%circuit['id']
+    oc.c_circuit_create_on_server(circuit, circuit['start_ip_address'])
+    oc.c_circuit_create_on_server(circuit, circuit['end_ip_address'])
 
     print "Return circuit"
     return jsonify( { 
@@ -385,6 +392,49 @@ def delete_circuits(circuit_id):
     circuits.remove(circuit[0])
     return jsonify( { 'status':'ok','result': circuit[0]['id'] } )
     
+@app.route('/orchestrator/api/v1.0/reportmetrics/<int:circuit_id>', methods = ['PUT'])
+# @auth.login_required
+def report_metrics(circuit_id):
+    global latency
+    global throughput
+    circuit = filter(lambda t: t['id'] == circuit_id, circuits)
+    if len(circuit) == 0:
+        abort(404)
+    latency = request.json.get('latency', latency)
+    throughput = request.json.get('throughput', throughput)
+    return jsonify( { 'status':'ok', 'result': True } )
+
+@app.route('/orchestrator/api/v1.0/reportstatus/<int:circuit_id>', methods = ['PUT'])
+# @auth.login_required
+def report_status(circuit_id):
+    circuit = filter(lambda t: t['id'] == circuit_id, circuits)
+    if len(circuit) == 0:
+        abort(404)
+    tempactive = circuit[0]['active']
+    s = request.json.get('status', "")
+    
+    if s == 'running':
+	print "status ", s
+        active = circuit[0]['active'] = True
+    else:
+	print "status ", s
+        active = circuit[0]['active'] = False
+
+    print "active ", active
+    if tempactive == active:
+	print "status no change"
+    else:
+        oc.o_report_status_self(circuit_id, circuit[0]['self'], make_circuit_status(circuit_id,circuit[0]['active']))
+    return jsonify( { 'status':'ok', 'result': True } )
+
+#@app.route('/orchestrator/api/v1.0/performancemetrics/<int:circuit_id>', methods = ['PUT'])
+# @auth.login_required
+#def report_metrics(circuit_id):
+#    circuit = filter(lambda t: t['id'] == circuit_id, circuits)
+#    if len(circuit) == 0:
+#        abort(404)
+#    return jsonify( { 'status':'ok', 'result': True } )
+
 @app.route('/orchestrator/api/v1.0/performancemetrics/<int:circuit_id>', methods = ['GET'])
 # @auth.login_required
 def performance_metrics_get(circuit_id):
@@ -430,8 +480,8 @@ def compute_circuit_create():
     myserver = request.host.split(":",2)
     if myserver[0] == circuit['start_ip_address']:
         c_circuit_add(circuit['id'], circuit['start_ip_address'], circuit['end_ip_address'])
-        if options.pingstart:
-	   start_ping(circuit, circuit['end_ip_address'])
+        #if options.pingstart:
+	start_ping(circuit, circuit['end_ip_address'])
     else:
         c_circuit_add(circuit['id'], circuit['end_ip_address'], circuit['start_ip_address'])
         
@@ -572,10 +622,16 @@ class PingLoop(threading.Thread):
                 netUp = True
                 if self.options.notify:
                     showNotification('Net Status', 'Net is back!')
+                    if self.circuit['active'] == False:
+                	self.circuit['active'] = True
+			oc.o_report_status(circuit_id, make_circuit_status(circuit_id, self.circuit['active']))
             elif replyFailCount >= 10 and netUp:
                 netUp = False
                 if self.options.notify:
                     showNotification('Net Status', 'Net is down!')
+                    if self.circuit['active'] == True:
+                	self.circuit['active'] = False
+			oc.o_report_status(circuit_id, make_circuit_status(circuit_id, self.circuit['active']))
 
             if not self.options.quite or not delay:
                 # cls()
@@ -587,7 +643,10 @@ class PingLoop(threading.Thread):
                     print 'Last timeout was ', str(timedelta(seconds=time() - lastTimeout)), 'seconds ago.'
                 elif lastTimeout:
                     print 'Last timeout was at ', ctime(lastTimeout)
+
+			
                 #else:
+
                 #    print 'There has been no timeouts yet! Hurray!'
                 sleep(2)
 
