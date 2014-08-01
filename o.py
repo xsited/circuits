@@ -1,18 +1,19 @@
 #!/usr/bin/env python
 
 '''
-
-
-pip install flask Flask-HTTPAuth
-
 '''
 
+__author__ = 'xsited'
 import os
 import sys
-import time
 import json
 import argparse
 import datetime
+import socket
+import threading
+import select
+from time import time, sleep, ctime
+from collections import deque
 from restapi import OClient
 
 import subprocess as subps
@@ -33,7 +34,22 @@ except ImportError:
     print 'sudo pip install Flask-HTTPAuth'
     sys.exit(1)
 
+
+try:
+    import daemonize
+except ImportError:
+    daemonize = None
  
+try:
+    import ping
+except ImportError:
+    ping = None
+    print 'You will need the ping python module installed to use this script'
+    print 'You can install it using the following command'
+    print 'sudo pip install ping'
+    sys.exit(1)
+
+
 class oTimeout(Exception):
     pass
 
@@ -44,6 +60,7 @@ class oError(Exception):
 app = Flask(__name__, static_url_path = "")
 auth = HTTPBasicAuth()
 oc = OClient()
+pthread = threading.Thread()
 
 @auth.get_password
 def get_password(username):
@@ -144,11 +161,13 @@ def c_circuit_add(circuit_id,start_ip, end_ip, circuit_type='gre'):
     print "tunnel_start_ip = %s" % tunnel_start_ip
     tunnel_end_ip="192.168.222." + end_host
     print "tunnel_end_ip = %s" % tunnel_end_ip
-    data_start_ip="10.0.0." + start_host
+    data_start_ip="10.36.0." + start_host
     print "data_start_ip = %s" % data_start_ip
-    data_end_ip="10.0.0." + end_host
+    data_end_ip="10.36.0." + end_host
     print "data_end_ip = %s" % data_end_ip
      
+
+    print "Remote Server = ", end_ip
 
      
     '''
@@ -245,7 +264,7 @@ def make_circuit_metrics(circuit_id, latency, throughput):
     new_metrics['id'] = circuit_id
     new_metrics['latency'] = latency
     new_metrics['throughput'] = throughput
-    new_metrics['latency_UnitMeasurement'] = "msec"
+    new_metrics['latency_UnitMeasurement'] = "ms"
     new_metrics['throughput_UnitMeasurement'] = "Mbps"
     return new_metrics
 
@@ -289,8 +308,10 @@ def create_circuit():
     circuits.append(circuit)
     
     print "Call computes to create circuit"
-    oc.c_circuit_create_on_server(circuit, circuit['start_ip_address'])
-    oc.c_circuit_create_on_server(circuit, circuit['end_ip_address'])
+    c_circuit = circuit
+    c_circuit['self']='http://10.0.0.192:5555/orchstrator/api/v1.0/faultmonitor/',  circuit['id']
+    oc.c_circuit_create_on_server(c_circuit, c_circuit['start_ip_address'])
+    oc.c_circuit_create_on_server(c_circuit, c_circuit['end_ip_address'])
 
     print "Return circuit"
     return jsonify( { 
@@ -359,8 +380,8 @@ def delete_circuits(circuit_id):
     if len(circuit) == 0:
         abort(404)
     print "Call computes to delete circuit"
-    oc.c_circuit_delete_on_server(circuit_id, circuit['start_ip_address'])
-    oc.c_circuit_delete_on_server(circuit_id, circuit['end_ip_address'])
+    oc.c_circuit_delete_on_server(circuit_id, circuit[0]['start_ip_address'])
+    oc.c_circuit_delete_on_server(circuit_id, circuit[0]['end_ip_address'])
     circuits.remove(circuit[0])
     return jsonify( { 'status':'ok','result': circuit[0]['id'] } )
     
@@ -393,6 +414,7 @@ def compute_performance_metrics_get(circuit_id):
 @app.route('/compute/api/v1.0/circuits', methods = ['POST'])
 # @auth.login_required
 def compute_circuit_create():
+    global options
     if not request.json or not 'service_type' in request.json:
         abort(400)
     circuit = {
@@ -404,8 +426,12 @@ def compute_circuit_create():
         'classifier': request.json.get('classifier', ""),
         'active': True
     }
-    if request.host == circuit['start_ip_address']:
+    #if request.host == circuit['start_ip_address']:
+    myserver = request.host.split(":",2)
+    if myserver[0] == circuit['start_ip_address']:
         c_circuit_add(circuit['id'], circuit['start_ip_address'], circuit['end_ip_address'])
+        if options.pingstart:
+	   start_ping(circuit, circuit['end_ip_address'])
     else:
         c_circuit_add(circuit['id'], circuit['end_ip_address'], circuit['start_ip_address'])
         
@@ -423,6 +449,10 @@ def compute_circuit_delete(circuit_id):
     circuit = filter(lambda t: t['id'] == circuit_id, circuits)
     if len(circuit) == 0:
         abort(404)
+    myserver = request.host.split(":",2)
+    if myserver[0] == circuit[0]['start_ip_address']:
+	stop_ping()
+        
     c_circuit_delete(circuit_id, circuit[0]['end_ip_address'], circuit[0]['start_ip_address'])
     circuits.remove(circuit[0])
     return jsonify( { 'status':'ok','result': circuit[0]['id'] } )
@@ -441,8 +471,12 @@ def parse_options():
     parser = argparse.ArgumentParser(prog='o.py', description='ReSTFul ochestrator to create circuit')
     parser.add_argument('-q', '--quite', action='store_true',
                         help='Quite mode, update the terminal only when there is a timeout')
+    parser.add_argument('-n', '--notify', action='store_true',
+                        help='Notify on')
     parser.add_argument('-c', '--compute', action='store_true',
                         help='Perform Compute role')
+    parser.add_argument('-p', '--pingstart', action='store_true',
+                        help='Autostart health checking on circuit create')
     parser.add_argument('-d', '--daemonize', action='store_true',
                         help='Run the process in the background as a daemon ')
     args = parser.parse_args()
@@ -451,6 +485,8 @@ def parse_options():
 
     
 def main():
+     
+    global options 
     options = parse_options()
     uid = os.getuid()
     # print 'UserID = ', uid
@@ -471,21 +507,100 @@ def main():
         print 'sudo pip install daemonize'
         sys.exit(1)
 
-    app.run('0.0.0.0', 5555, debug=True)
-
-
-def ping_endpoint():
     if options.daemonize:
         options.notify = True
-        pingLoop = PingLoop(options)
-        daemon = daemonize.Daemonize(app='check_circuit', pid='/tmp/check_circuit.pid', action=pingLoop.runPingLoop)
+        daemon = daemonize.Daemonize(app='o', pid='/tmp/o.pid', action=main)
         daemon.start()
     else:
         if options.quite:
             print('Running in quite mode, will update when a timeout occurs')
 
-        pingLoop = PingLoop(options)
-        pingLoop.runPingLoop()
+    app.run('0.0.0.0', 5555, debug=True)
+
+
+
+
+def cls():
+    os.system(['clear', 'cls'][os.name == 'nt'])
+
+
+def showNotification(title, body):
+    print title, body
+
+# PingLoop adopted and modified from check_internet.py, Akshet Pandey argetlam [dot] akshet [at] gmail [dot] com
+class PingLoop(threading.Thread):
+    def __init__(self, options, circuit, endpoint):
+        self.options = options
+        self.circuit = circuit
+        self.endpoint = endpoint
+        self.loop = True
+	threading.Thread.__init__(self)
+        #signal.signal(signal.SIGINT, self.stopLoop)
+
+    def stopLoop(self):
+        if self.loop:
+            self.loop = False
+            print 'Received exit signal. Stopping!'
+
+    #def runPingLoop(self):
+    def run(self):
+        delayList = deque(maxlen=100)
+        lastTimeout = None
+        netUp = True
+        replySuccessCount = 0
+        replyFailCount = 0
+
+        # cls()
+        while self.loop:
+            try:
+                delay = ping.do_one(self.endpoint, 3, 64)
+            except socket.error:
+                delay = None
+            except select.error:
+                delay = None
+
+            if delay:
+                delayList.append(delay)
+                replySuccessCount += 1
+                replyFailCount = 0
+            else:
+                lastTimeout = time()
+                replySuccessCount = 0
+                replyFailCount += 1
+
+            if replySuccessCount >= 10 and not netUp:
+                netUp = True
+                if self.options.notify:
+                    showNotification('Net Status', 'Net is back!')
+            elif replyFailCount >= 10 and netUp:
+                netUp = False
+                if self.options.notify:
+                    showNotification('Net Status', 'Net is down!')
+
+            if not self.options.quite or not delay:
+                # cls()
+                if len(delayList):
+		    global latency 
+		    latency = str(sum(delayList) / len(delayList) * 1000)
+                    print 'Circuit id ', self.circuit['id'], ' status of  ', self.circuit['end_ip_address'], 'Average delay of last ', len(delayList), ' pings is ', sum(delayList) / len(delayList) * 1000, ' ms'
+                if not self.options.quite and lastTimeout:
+                    print 'Last timeout was ', str(timedelta(seconds=time() - lastTimeout)), 'seconds ago.'
+                elif lastTimeout:
+                    print 'Last timeout was at ', ctime(lastTimeout)
+                #else:
+                #    print 'There has been no timeouts yet! Hurray!'
+                sleep(2)
+
+
+def stop_ping():
+    global pingLoop
+    pingLoop.stopLoop()
+    # pingLoop.cancel()
+
+def start_ping(circuit, end_ip):
+    global pingLoop
+    pingLoop = PingLoop(options, circuit, end_ip)
+    pingLoop.start()
 
 
 if __name__ == '__main__':
@@ -517,6 +632,8 @@ Request methods using CURL:
 8. curl -i -u user:password  -H "Content-Type: application/json" -X DELETE http://localhost:5555/orchestrator/api/v1.0/circuits/2
 
 9. curl -i  -H "Content-Type: application/json" -X PUT -d '{"active":true}' http://localhost:5555/debug
+
+
  
 '''
 
