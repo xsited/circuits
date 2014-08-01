@@ -30,9 +30,12 @@ ip route add default dev eth0 via 10.36.0.1
 
 ifconfig eth1 10.0.0.135 up
 
+ovs-vs-ctl add-br isolated0
+
 ifconfig isolated0 192.168.222.135 up
 
 ifconfig eth2 0.0.0.0 up
+ovs-vs-ctl add-port isolated0 eth2
 
 ```
 
@@ -87,5 +90,12 @@ This works better. You leave it runs, but stop does not work.  Search the proces
 
 ```sh
 sudo ./run_o.sh start
+```
+
+Run Unit Test Examples
+======================
+
+```sh
+./restappi.py
 ```
 
