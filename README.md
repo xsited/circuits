@@ -105,3 +105,45 @@ Run Unit Test Examples
 ./restappi.py
 ```
 
+Script a Sequence
+=================
+```sh
+------------------------------
+   MENU      
+------------------------------
+a. Openflow           
+b. Orchestration      
+c. Main               
+q. Quit               
+Enter selection: b
+------------------------------
+   ORCHESTRATION      
+------------------------------
+17. Hello             
+18. Circuit Get All   
+19. Circuit Get One   
+20. Circuit Add       
+21. Circuit Update    
+22. Circuit Delete    
+23. Circuit Remove All
+24. Fault Monitor Service 
+25. Compute Performance Metrics
+26. Compute Create    
+27. Compute Delete    
+28. Compute Ping      
+29. Orchestration Report Status
+30. Orchestration Report Metrics
+31. Orchestration Performance Metrics
+c. Main               
+q. Quit               
+Enter selection: 
+```
+Menu Choice Sequence
+17
+28
+20
+18
+31 -> 3
+22 -> 3
+
+
