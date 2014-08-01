@@ -92,6 +92,12 @@ This works better. You leave it runs, but stop does not work.  Search the proces
 sudo ./run_o.sh start
 ```
 
+Sketched out, but not tested yet.  Backgrounder.
+
+```sh
+sudo ./o.py -d
+```
+
 Run Unit Test Examples
 ======================
 
