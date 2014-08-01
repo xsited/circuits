@@ -262,6 +262,7 @@ class Menu(object):
 	"26":compute_create_circuit,
 	"27":compute_delete_circuit,
 	"28":compute_ping,
+	"29":orchestration_performance_metrics,
 	"q": exit_app,
         }
 
@@ -492,7 +493,7 @@ class OClient(object):
     	ws.set_server(temp_server)
 
     def c_circuit_delete_on_server(self, circuit_id, server):
-        ws.set_path('/compute/api/v1.0/circuits/' + circuit_id)
+        ws.set_path('/compute/api/v1.0/circuits/%d' % circuit_id)
 	ws.set_port(5555)	
     	temp_server=ws.get_server()
     	ws.set_server( server )
@@ -516,15 +517,22 @@ class OClient(object):
     # curl -i  -H "Content-Type: application/json" -X PUT -d '{"active":true}' http://localhost:5555/orchestrator/api/v1.0/circuits/1
     # curl -i  -H "Content-Type: application/json" -X PUT -d '{"active":true}' http://localhost:5555/orchestrator/api/v1.0/circuits/1
 
-    def c_faultdetection_service(self, on):
-        ws.set_path('/compute/api/v1.0/faultmonitor/<int:circuit_id>')
+    def c_faultdetection_service(self, circuit_id, on):
+        ws.set_path('/compute/api/v1.0/faultmonitor/%d' % circuit_id)
+	ws.set_port(5555)	
+        content = ws.get()
+        j=json.loads(content[2])
+        ws.show(j)
+
+    def o_performance_metrics(self,circuit_id):
+        ws.set_path('/orchestrator/api/v1.0/performancemetrics/'+circuit_id)
 	ws.set_port(5555)	
         content = ws.get()
         j=json.loads(content[2])
         ws.show(j)
 
     def c_performance_metrics_get(self,circuit_id):
-        ws.set_path('/compute/api/v1.0/performancemetrics/<int:circuit_id>')
+        ws.set_path('/compute/api/v1.0/performancemetrics/%d' % circuit_id)
 	ws.set_port(5555)	
         content = ws.get()
         j=json.loads(content[2])
@@ -537,8 +545,8 @@ class OClient(object):
 # XXX - ingress ports that possibly don't exist ? throw configuration errors
 circuit1 = {  
           "service_type": "epl", 
-          "start_ip_address": "192.168.1.3", 
-     	  "end_ip_address": "192.168.1.4", 
+	  "start_ip_address": "10.0.0.133", 
+	  "end_ip_address": "10.0.0.134", 
      	  "classifier": "red", 
           "self": "http://localhost:8888/service_id/1" 
 }
@@ -847,10 +855,20 @@ def orchestration_circuit_remove_all():
 
 def compute_faultdetection_service():
     print "Compute Fault Service"
+    circuit_id = raw_input("Enter circuit id: ")
+    if "quit" == circuit_id:
+         return
     onoff = raw_input("Enter on = 1 or off = 0: ")
     if "quit" == onoff:
          return
-    oc.c_faultdetection_service(onoff)
+    oc.c_faultdetection_service(circuit_id,onoff)
+
+def orchestration_performance_metrics():
+    print "Orchestration Performance  Metrics"
+    circuit_id = raw_input("Enter circuit id: ")
+    if "quit" == circuit_id:
+         return
+    oc.o_performance_metrics(circuit_id)
 
 def compute_performance_metrics_get():
     print "Performance  Metrics"
@@ -886,9 +904,9 @@ def compute_delete_circuit():
 def hello():
     oc.o_hello()
 
+ws = RestfulAPI('127.0.0.1')
 
 if __name__ == "__main__":
-    ws = RestfulAPI('127.0.0.1')
     #ws = RestfulAPI('192.168.56.10')
     ws.credentials('admin', 'admin')
     odl = ODL()
