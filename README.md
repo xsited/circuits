@@ -98,6 +98,12 @@ Sketched out, but not tested yet.  Backgrounder.
 sudo ./o.py -d
 ```
 
+Foreground with logging
+
+```sh
+sudo ./o.py
+```
+
 Run Unit Test Examples
 ======================
 
