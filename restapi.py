@@ -1,10 +1,11 @@
 #!/usr/bin/env python
 
-__author__ = 'xisted'
+__author__ = 'xsited'
 import httplib
 import json
 import base64
 import string
+from urlparse import urlparse
 
 toggle = 1
 toggle_pcmm = 1
@@ -30,10 +31,13 @@ class RestfulAPI(object):
         self.server = server
         self.path = '/wm/staticflowentrypusher/json'
         self.auth = ''
-        self.port = '8080'
+        self.port = 8080
 
-    def get_server(self, server):
+    def get_server(self):
         return self.server
+
+    def set_server(self, server):
+        self.server = server
 
 
     def set_path(self, path):
@@ -108,7 +112,7 @@ class RestfulAPI(object):
         #conn = httplib.HTTPConnection(self.server, self.port)
         conn = httplib.HTTP(self.server, self.port)
         conn.putrequest(action, self.path)
-	conn.putheader("Host", self.server+':'+self.port)
+	conn.putheader("Host", self.server+':%s'%self.port)
  	conn.putheader("User-Agent", "Python HTTP Auth")
         conn.putheader('Content-type', 'application/json')
         body = json.dumps(data)
@@ -152,6 +156,7 @@ class RestfulAPI(object):
 		'Content-length': "%d" % len(body),
                 }
 		
+	print self.server+':',self.port, self.path
         conn = httplib.HTTPConnection(self.server, self.port)
         conn.request(action, self.path, body, headers)
         response = conn.getresponse()
@@ -187,8 +192,13 @@ class Menu(object):
         print ("22. Circuit Delete    ")
         print ("23. Circuit Remove All")
         print ("24. Fault Monitor Service ")
-        print ("25. Performance Metrics")
+        print ("25. Compute Performance Metrics")
         print ("26. Compute Create    ")
+	print ("27. Compute Delete    ")
+        print ("28. Compute Ping      ")
+        print ("29. Orchestration Report Status")
+        print ("30. Orchestration Report Metrics")
+        print ("31. Orchestration Performance Metrics")
         print ("c. Main               ")
         print ("q. Quit               ")
 #        print (30 * '-')
@@ -251,9 +261,16 @@ class Menu(object):
 	"21":orchestration_circuit_update,
 	"22":orchestration_circuit_delete,
 	"23":orchestration_circuit_remove_all,
-	"24":compute_faultmonitor_service,
-	"25":compute_performance_metrics_get,
+	"24":compute_faultdetection_service,
+        "25":compute_performance_metrics_get,
 	"26":compute_create_circuit,
+	"27":compute_delete_circuit,
+	"28":compute_ping,
+	"29":orchestration_report_status,
+	"30":orchestration_report_metrics,
+	"31":orchestration_performance_metrics,
+	"32":hello_cubies,
+	"33":compute_create_circuit_cubies,
 	"q": exit_app,
         }
 
@@ -474,28 +491,97 @@ class OClient(object):
         ws.set_path('/compute/api/v1.0/circuits')
 	ws.set_port(5555)	
     	temp_server=ws.get_server()
-    	ws.set_server("http://" + server )
+    	print "Temp Server = ", temp_server
+    	ws.set_server( server )
+    	print "Server = ", ws.get_server()
         ws.show(circuit)
 	content = ws.post(circuit)
         j=json.loads(content[2])
         ws.show(j)
     	ws.set_server(temp_server)
 
+    def c_circuit_delete_on_server(self, circuit_id, server):
+        ws.set_path('/compute/api/v1.0/circuits/%d' % circuit_id)
+	ws.set_port(5555)	
+    	temp_server=ws.get_server()
+    	ws.set_server( server )
+	content = ws.remove("",circuit1)
+        j=json.loads(content[2])
+        ws.show(j)
+    	ws.set_server(temp_server)
+
+    def c_hello(self, server):
+	ws.set_path('/orchestrator/api/v1.0/hello')	
+	ws.set_port(5555)	
+    	temp_server=ws.get_server()
+    	ws.set_server( server )
+	content = ws.get()
+        j=json.loads(content[2])
+        ws.show(j)
+    	ws.set_server(temp_server)
+
+
+
+    # curl -i  -H "Content-Type: application/json" -X PUT -d '{"active":true}' http://localhost:5555/orchestrator/api/v1.0/circuits/1
     # curl -i  -H "Content-Type: application/json" -X PUT -d '{"active":true}' http://localhost:5555/orchestrator/api/v1.0/circuits/1
 
-    def c_faultdetection_service(self, on):
-        ws.set_path('/compute/api/v1.0/faultmonitor/<int:circuit_id>')
+    def c_faultdetection_service(self, circuit_id, on):
+        ws.set_path('/compute/api/v1.0/faultmonitor/%d' % circuit_id)
 	ws.set_port(5555)	
         content = ws.get()
         j=json.loads(content[2])
         ws.show(j)
 
-    def c_performance_metrics_get(self,circuit_id):
-        ws.set_path('/compute/api/v1.0/performancemetrics/<int:circuit_id>')
+    def o_report_status_self(self,circuit_id, uri, status):
+    	temp_server=ws.get_server()
+	#XXX - validate
+        o = urlparse(uri)
+        tmp = o.netloc.split(":",2)
+	print tmp
+	print o.path
+	print o.netloc
+        ws.set_server(tmp[0])
+        ws.set_port(tmp[1])
+        ws.set_path(o.path)
+        content = ws.put(status)
+        j=json.loads(content[2])
+        ws.show(j)
+    	ws.set_server(temp_server)
+
+    def o_report_status(self,circuit_id, status, server):
+        ws.set_path('/orchestrator/api/v1.0/reportstatus/'+circuit_id)
+	ws.set_port(5555)	
+    	temp_server=ws.get_server()
+    	ws.set_server( server )
+        content = ws.put(status)
+        j=json.loads(content[2])
+        ws.show(j)
+    	ws.set_server(temp_server)
+
+    def o_report_metrics(self,circuit_id, metrics):
+        ws.set_path('/orchestrator/api/v1.0/reportmetrics/'+circuit_id)
+	ws.set_port(5555)	
+        content = ws.put(metrics)
+        j=json.loads(content[2])
+        ws.show(j)
+
+    def o_performance_metrics(self,circuit_id):
+        ws.set_path('/orchestrator/api/v1.0/performancemetrics/'+circuit_id)
 	ws.set_port(5555)	
         content = ws.get()
         j=json.loads(content[2])
         ws.show(j)
+
+
+    def c_performance_metrics_get(self,circuit_id, server):
+        ws.set_path('/compute/api/v1.0/performancemetrics/%d' % circuit_id)
+	ws.set_port(5555)	
+    	temp_server=ws.get_server()
+    	ws.set_server( server )
+        content = ws.get()
+        j=json.loads(content[2])
+        ws.show(j)
+    	ws.set_server(temp_server)
 
 
 
@@ -504,10 +590,11 @@ class OClient(object):
 # XXX - ingress ports that possibly don't exist ? throw configuration errors
 circuit1 = {  
           "service_type": "epl", 
-          "start_ip_address": "192.168.1.3", 
-     	  "end_ip_address": "192.168.1.4", 
+	  "start_ip_address": "10.0.0.133", 
+	  "end_ip_address": "10.0.0.134", 
      	  "classifier": "red", 
-          "self": "http://localhost:8888/service_id/1" 
+          "self": "http://10.36.0.192:9000/vcpe-service/53dbfa230607df6d45ab66e8",
+	  "active": False 
 }
 
 circuit2 = { 
@@ -515,18 +602,10 @@ circuit2 = {
 	  "start_ip_address": "192.168.1.3", 
 	  "end_ip_address": "192.168.1.4", 
 	  "classifier": "blue", 
-	  "self": "http://localhost:8888/service_id/1", 
+          "self": "http://10.36.0.192:9000/vcpe-service/53dbfa230607df6d45ab66e8",
 	  "active": True 
 }
 
-circuit3 = { 
-	  "service_type": "epl", 
-	  "start_ip_address": "10.0.0.133", 
-	  "end_ip_address": "10.0.0.134", 
-	  "classifier": "blue", 
-	  "self": "http://localhost:8888/service_id/1", 
-	  "active": True 
-}
 
 flow1 = {
         "actions": [
@@ -822,26 +901,118 @@ def orchestration_circuit_remove_all():
 
 def compute_faultdetection_service():
     print "Compute Fault Service"
+    circuit_id = raw_input("Enter circuit id: ")
+    if "quit" == circuit_id:
+         return
     onoff = raw_input("Enter on = 1 or off = 0: ")
     if "quit" == onoff:
          return
-    oc.c_faultdetection_service(onoff)
+    oc.c_faultdetection_service(circuit_id,onoff)
+
+def orchestration_performance_metrics():
+    print "Orchestration Performance  Metrics"
+    circuit_id = raw_input("Enter circuit id: ")
+    if "quit" == circuit_id:
+         return
+    oc.o_performance_metrics(circuit_id)
+
+metrics1={
+    "metrics": {
+        "id": 2, 
+        "latency": "0.412927117459", 
+        "latency_UnitMeasurement": "ms", 
+        "throughput": 100, 
+        "throughput_UnitMeasurement": "Mbps"
+    }, 
+    "status": "ok"
+}
+
+def orchestration_report_metrics():
+    print "Orchestration Report  Metrics"
+    circuit_id = raw_input("Enter circuit id: ")
+    if "quit" == circuit_id:
+         return
+    oc.o_report_metrics(circuit_id, metrics1)
+
+def orchestration_report_status():
+    print "Orchestration Report  Status"
+    circuit_id = raw_input("Enter circuit id: ")
+    if "quit" == circuit_id:
+         return
+    onoff = raw_input("Enter on = 1 or off = 0: ")
+    if "quit" == onoff:
+         return
+    if onoff == "1":
+        print "True"
+	status = { 
+		"status" : "running"
+	}
+    else:
+        print "False"
+	status = { 
+		"status" : "suspended"
+	}
+
+    oc.o_report_status(circuit_id, status)
 
 def compute_performance_metrics_get():
-    print "Performance  Metrics"
-    oc.c_performance_metrics_get(circuit_id)
+    print "Compute Performance  Metrics"
+    circuit_id = raw_input("Enter circuit id: ")
+    if "quit" == circuit_id:
+         return
+    oc.c_performance_metrics_get(int(circuit_id), circuit3['start_ip_address'])
+
+circuit3 = { 
+	  "service_type": "epl", 
+	  "start_ip_address": "10.0.0.133", 
+	  "end_ip_address": "10.0.0.134", 
+	  "classifier": "blue", 
+	  "self": "http://localhost:8888/service_id/1", 
+	  "active": True 
+}
+circuit4 = { 
+	  "service_type": "epl", 
+	  "start_ip_address": "10.0.0.135", 
+	  "end_ip_address": "10.0.0.136", 
+	  "classifier": "blue", 
+	  "self": "http://localhost:8888/service_id/1", 
+	  "active": True 
+}
+
+def hello_cubies():
+    print "Compute Create Circuit"
+    oc.c_hello(circuit4['start_ip_address'])
+    oc.c_hello(circuit4['end_ip_address'])
+
+def compute_create_circuit_cubies():
+    print "Compute Create Circuit Cubie"
+    oc.c_circuit_create_on_server(circuit4, circuit4['start_ip_address'])
+    oc.c_circuit_create_on_server(circuit4, circuit4['end_ip_address'])
+
+def compute_ping():
+    print "Compute Create Circuit"
+    oc.c_hello(circuit3['start_ip_address'])
+    oc.c_hello(circuit3['end_ip_address'])
 
 def compute_create_circuit():
-    print "Create Circuit"
+    print "Compute Create Circuit"
     oc.c_circuit_create_on_server(circuit3, circuit3['start_ip_address'])
     oc.c_circuit_create_on_server(circuit3, circuit3['end_ip_address'])
+
+def compute_delete_circuit():
+    print "Compute Delete Circuit"
+    circuit_id = raw_input("Enter circuit id: ")
+    if "quit" == circuit_id:
+         return
+    oc.c_circuit_delete_on_server(circuit_id, circuit3['start_ip_address'])
+    oc.c_circuit_delete_on_server(circuit_id, circuit3['end_ip_address'])
 
 def hello():
     oc.o_hello()
 
+ws = RestfulAPI('127.0.0.1')
 
 if __name__ == "__main__":
-    ws = RestfulAPI('127.0.0.1')
     #ws = RestfulAPI('192.168.56.10')
     ws.credentials('admin', 'admin')
     odl = ODL()

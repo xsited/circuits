@@ -19,7 +19,7 @@ curl -i  -H "Content-Type: application/json" -X PUT -d '{"start_ip_address":"2.2
 
 curl -i  -H "Content-Type: application/json" -X PUT -d '{"active":true}' http://localhost:5555/orchestrator/api/v1.0/circuits/1
 
-curl -i -u user:password http://localhost:5555//orchestrator/api/v1.0/performancemetrics/2
+curl -i -u user:password http://localhost:5555/orchestrator/api/v1.0/performancemetrics/2
 
 curl -i -u user:password  -H "Content-Type: application/json" -X DELETE http://localhost:5555/orchestrator/api/v1.0/circuits/2
 
