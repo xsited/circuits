@@ -1,6 +1,10 @@
 #!/usr/bin/env python
 
 '''
+both of these api are driven by the same script but distributed as (o), (a), and (b)
+(d) is the private central data store for circuits and endpoints
+webapp (p) to (o) orchestrator public api and consumse the information collected
+orchestrator to endpoint private for circuit provisioning from (o) to endpoint (a) and endpoint (b)
 '''
 
 __author__ = 'xsited'
@@ -21,19 +25,27 @@ import subprocess as subps
 try:
     from flask import Flask, jsonify, abort, request, make_response, url_for
 except ImportError:
-    print 'You will need the Flask python module installed to use this script'
-    print 'You can install it using the following command'
-    print 'sudo pip install Flask'
+    logger.error( 'You will need the Flask python module installed to use this script' )
+    logger.error(  'You can install it using the following command' )
+    logger.error(  'sudo pip install Flask' )
     sys.exit(1)
 
 try:
     from flask.ext.httpauth import HTTPBasicAuth
 except ImportError:
-    print 'You will need the HTTPBasicAuth python module installed to use this script'
-    print 'You can install it using the following command'
-    print 'sudo pip install Flask-HTTPAuth'
+    logger.error(  'You will need the HTTPBasicAuth python module installed to use this script' )
+    logger.error(  'You can install it using the following command' )
+    logger.error(  'sudo pip install Flask-HTTPAuth' )
     sys.exit(1)
 
+
+try:
+    from flask.ext.restful import reqparse, abort, Api, Resource, request
+except ImportError:
+    logger.error(  'You will need the Flask-RESTful python module installed to use this script' )
+    logger.error(  'You can install it using the following command' )
+    logger.error(  'sudo pip install Flask-RESTful' )
+    sys.exit(1)
 
 try:
     import daemonize
@@ -44,9 +56,9 @@ try:
     import ping
 except ImportError:
     ping = None
-    print 'You will need the ping python module installed to use this script'
-    print 'You can install it using the following command'
-    print 'sudo pip install ping'
+    logger.error(  'You will need the ping python module installed to use this script' )
+    logger.error(  'You can install it using the following command' )
+    logger.error(  'sudo pip install ping' )
     sys.exit(1)
 
 
@@ -106,6 +118,45 @@ circuits = [
 ]
  
 
+import logging
+
+
+# create logger ??? global conext or pass to class
+logger = logging.getLogger(os.path.basename(__file__))
+logger.setLevel(logging.INFO)
+
+def logging_configure(console=False, debug=False):
+
+    if console==True:
+        # create console handler and set level to debug
+        ch = logging.StreamHandler()
+        if debug == True:
+            ch.setLevel(logging.DEBUG)
+        else:
+            ch.setLevel(logging.INFO)
+
+        # create formatter
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+        # add ch to logger
+        logger.addHandler(ch)
+
+        # add formatter to ch
+        ch.setFormatter(formatter)
+
+
+    if debug == True:
+        logger.setLevel(logging.DEBUG)
+        # 'application' code
+        logger.debug('debug message')
+        logger.info('info message')
+        logger.warn('warn message')
+        logger.error('error message')
+        logger.critical('critical message')
+
+    return logger
+
+
 
 def c_circuit_delete(circuit_id,start_ip, end_ip, circuit_type='gre'):
     if circuit_type == 'gre':
@@ -151,6 +202,10 @@ def c_circuit_add(circuit_id,start_ip, end_ip, circuit_type='gre'):
     end_ip = 10.0.0.134
     '''
 
+    '''
+    This is the last minute mess to address the required interfaces because we don't have enough information on about an endpoint
+    '''
+
     mylist = start_ip.split(".",4)
     start_host = mylist[3]
     print "start_host = %s" % start_host
@@ -171,6 +226,8 @@ def c_circuit_add(circuit_id,start_ip, end_ip, circuit_type='gre'):
 
      
     '''
+    Consider this a CLI driver of sorts
+
     This is the tunnel addressing assumed configuration
     ovs-vsctl add-br isolated0
     #ifconfig isolated0 192.168.222.133 up
@@ -519,6 +576,9 @@ def get_root():
 
 def parse_options():
     parser = argparse.ArgumentParser(prog='o.py', description='ReSTFul ochestrator to create circuit')
+    '''
+   	Alot of these switch were in place to navigate around untested code
+    '''
     parser.add_argument('-q', '--quite', action='store_true',
                         help='Quite mode, update the terminal only when there is a timeout')
     parser.add_argument('-n', '--notify', action='store_true',
@@ -529,6 +589,12 @@ def parse_options():
                         help='Autostart health checking on circuit create')
     parser.add_argument('-d', '--daemonize', action='store_true',
                         help='Run the process in the background as a daemon ')
+    parser.add_argument('-l', '--logconsole', action='store_true',
+                        help='Add console to logging output ')
+    parser.add_argument('-v', '--verbosedebug', action='store_true',
+                        help='Add verbose debug statements to logging output ')
+    parser.add_argument('-s', '--serverip', action='store_true',
+                        help='Endpoint contacts this server to register and provide endpoint information to orchestrator ')
     args = parser.parse_args()
     return args
 
@@ -537,13 +603,19 @@ def parse_options():
 def main():
      
     global options 
+    global logger 
+
     options = parse_options()
     uid = os.getuid()
-    # print 'UserID = ', uid
+
+    logger = logging_configure(options.logconsole, options.verbosedebug)
+    logger.debug ('Options = %s', options )
+    logger.debug( 'UserID = %s', uid )
+
     if uid != 0:
-        print 'Failed to get root permissions. Exiting!'
-        print 'You need to run as root to set command and open raw sockets'
-        print 'sudo python o.py'
+        logger.error ( 'Failed to get root permissions. Exiting!' )
+        logger.error ( 'You need to run as root to set command and open raw sockets' )
+        logger.error ( 'sudo python o.py' )
         sys.exit(1)
 
     #   uid = get_root()
@@ -552,9 +624,9 @@ def main():
     #       sys.exit(1)
 
     if options.daemonize and not daemonize:
-        print 'You do not have the necessary library run in daemon mode'
-        print 'Install the library using the following command'
-        print 'sudo pip install daemonize'
+        logger.error ( 'You do not have the necessary library run in daemon mode')
+        logger.error ( 'Install the library using the following command')
+        logger.error ( 'sudo pip install daemonize' )
         sys.exit(1)
 
     if options.daemonize:
@@ -563,10 +635,9 @@ def main():
         daemon.start()
     else:
         if options.quite:
-            print('Running in quite mode, will update when a timeout occurs')
+            logger.info('Running in quite mode, will update when a timeout occurs')
 
     app.run('0.0.0.0', 5555, debug=True)
-
 
 
 
@@ -590,7 +661,7 @@ class PingLoop(threading.Thread):
     def stopLoop(self):
         if self.loop:
             self.loop = False
-            print 'Received exit signal. Stopping!'
+            logging.info ('Received exit signal. Stopping!')
 
     #def runPingLoop(self):
     def run(self):
@@ -640,9 +711,9 @@ class PingLoop(threading.Thread):
 		    latency = str(sum(delayList) / len(delayList) * 1000)
                     print 'Circuit id ', self.circuit['id'], ' status of  ', self.circuit['end_ip_address'], 'Average delay of last ', len(delayList), ' pings is ', sum(delayList) / len(delayList) * 1000, ' ms'
                 if not self.options.quite and lastTimeout:
-                    print 'Last timeout was ', str(timedelta(seconds=time() - lastTimeout)), 'seconds ago.'
+                    logging.info( 'Last timeout was ', str(timedelta(seconds=time() - lastTimeout)), 'seconds ago.')
                 elif lastTimeout:
-                    print 'Last timeout was at ', ctime(lastTimeout)
+                    logging.info( 'Last timeout was at ', ctime(lastTimeout))
 
 			
                 #else:
@@ -655,6 +726,10 @@ def stop_ping():
     global pingLoop
     pingLoop.stopLoop()
     # pingLoop.cancel()
+
+'''
+ XXX - this ping thread is started with the wrong IP address
+'''
 
 def start_ping(circuit, end_ip):
     global pingLoop
