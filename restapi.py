@@ -199,6 +199,10 @@ class Menu(object):
         print ("29. Orchestration Report Status")
         print ("30. Orchestration Report Metrics")
         print ("31. Orchestration Performance Metrics")
+        print ("32. Cubie Hello       ")
+        print ("33. Cubie Circuit (TEST)")
+        print ("34. Cubie Circuit Add ")
+        print ("35. Cross Circuit Add ")
         print ("c. Main               ")
         print ("q. Quit               ")
 #        print (30 * '-')
@@ -271,6 +275,8 @@ class Menu(object):
 	"31":orchestration_performance_metrics,
 	"32":hello_cubies,
 	"33":compute_create_circuit_cubies,
+	"34":orchestration_circuit_add_cubie,
+	"35":orchestration_circuit_add_cross,
 	"q": exit_app,
         }
 
@@ -482,8 +488,8 @@ class OClient(object):
         ws.set_path('/orchestrator/api/v1.0/circuits/' + circuit_id)
 	ws.set_port(5555)	
 	content = ws.remove("",circuit1)
-        j=json.loads(content[2])
-        ws.show(j)
+        #j=json.loads(content[2])
+        #ws.show(j)
 
 
     # curl -i  -H "Content-Type: application/json" -X PUT -d '{"start_ip_address":"2.2.2.2","self":"http://local/1","end_ip_address":"1.1.1.1","service_type":"vepl","classifier":"11","active":true}' http://localhost:5555/compute/api/v1.0/circuits/1
@@ -873,6 +879,16 @@ def orchestration_circuit_get_one():
     oc.o_circuit_get(circuit_id)
     
 
+def orchestration_circuit_add_cross():
+    print "Orchestration Circuit Add_cross"
+    global circuit5
+    circuit_id5=oc.o_circuit_create(circuit5)
+
+
+def orchestration_circuit_add_cubie():
+    print "Orchestration Circuit Add_cubie"
+    global circuit4
+    circuit_id4=oc.o_circuit_create(circuit4)
 
 def orchestration_circuit_add():
     print "Orchestration Circuit Add"
@@ -974,6 +990,15 @@ circuit4 = {
 	  "service_type": "epl", 
 	  "start_ip_address": "10.0.0.135", 
 	  "end_ip_address": "10.0.0.136", 
+	  "classifier": "blue", 
+	  "self": "http://localhost:8888/service_id/1", 
+	  "active": True 
+}
+
+circuit5 = { 
+	  "service_type": "epl", 
+	  "start_ip_address": "10.0.0.135", 
+	  "end_ip_address": "10.0.0.134", 
 	  "classifier": "blue", 
 	  "self": "http://localhost:8888/service_id/1", 
 	  "active": True 
